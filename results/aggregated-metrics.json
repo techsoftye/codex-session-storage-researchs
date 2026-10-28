@@ -249,5 +249,7 @@
       "theirs_over_variant": 3.5295
     }
   },
-  "reference_variants_source": "data/reports/media_reference_comparison_v2/summary_corpus.json"
+  "reference_variants_source": "data/reports/media_reference_comparison_v2/summary_corpus.json",
+  "reference_variants_conditions": "Theirs = Codex .zst after the October 2026 legacy rewrite and zstd-3; variants = computed from the pre-October originals with zstd-3; 843 pairs matched by file name, modification times not verified. theirs_over_variant is a measured size ratio under this methodology, not a controlled end-to-end production comparison (paper Section 14.1).",
+  "snapshot_similarity_note": "Corpus-wide, 92.98% of compacted bytes are images (89.91%) or text blocks (3.07%) already present in the preceding snapshot. The ~98% item-level similarity comes from a three-snapshot sample of one session and is not a corpus statistic."
 }

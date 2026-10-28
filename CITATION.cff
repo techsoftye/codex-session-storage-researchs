@@ -18,5 +18,6 @@ abstract: >-
   An empirical study of 52.49 GiB of Codex session rollouts (845 files, January-October 2026).
   Compaction snapshots hold 77.13% of stored bytes and images repeated from the previous
   snapshot 69.34%, while the conversation is 2.89%. Codex's October 2026 rewrite reduces the
-  files to 10.60 GiB; storing images once in a shared media table and referencing them reduces
-  them to 3.00 GiB with the same zstd level.
+  files to 10.60 GiB. Storing images once in a shared media table and referencing them yields
+  3.00 GiB with the same zstd level, computed from the pre-October originals; this is a measured
+  size ratio under the reported methodology, not an end-to-end production comparison.

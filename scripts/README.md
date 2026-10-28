@@ -2,8 +2,9 @@
 
 The measurements were produced by a set of Python analyzers that use the standard library only
 (Python 3.14 for `compression.zstd`). A PostgreSQL 18 database holds record locators and token
-observations. The analyzers themselves are not part of this release, because they run against
-private local data.
+observations. The analyzer source code and its synthetic tests are not yet in this repository. The author
+will publish them separately. They run against private local session files, which are not
+published, so the measurements cannot be re-run from this repository alone.
 
 ## Rules every analyzer followed
 

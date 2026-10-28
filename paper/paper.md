@@ -2,7 +2,7 @@
 
 *An empirical study of 52.49 GiB of Codex session rollouts*
 
-Eng Rassam · October 2026 · Prepared for OpenAI
+Eng Rassam · October 2026 · Independent Research — Submitted for Consideration by OpenAI
 
 ## Abstract
 
@@ -14,17 +14,24 @@ context. We measured every stored byte of 845 Codex rollout files (52.49 GiB, Ja
 - **What is stored.** The user-role and assistant conversation is 2.89% of stored bytes, or 0.64%
   without embedded images. Execution traces are about 15%. Compaction snapshots are 77.13%, and
   69.34% of the corpus consists of images already present in the preceding snapshot.
-- **Why it accumulates.** Each compaction re-stores the retained history in full: consecutive
-  snapshots are about 98% identical. A compaction takes a median of 56.5 s, regardless of how
-  much it writes.
-- **Tokens.** Recorded token consumption follows the context sent and request continuity, not
-  file size. After controlling for session length, file size has no association with tokens
-  used.
+- **Why it accumulates.** Each compaction re-stores the retained history in full. Corpus-wide,
+  92.98% of compacted bytes are images and text blocks already present in the preceding snapshot;
+  in a three-snapshot sample from one session, about 98% of items were unchanged. A compaction
+  takes a median of 56.5 s, with no association with the size of what it writes.
+- **Tokens.** After controlling for session length, file size shows no association with
+  recorded tokens used (partial Spearman −0.019, n = 189). Code and log case studies are
+  consistent with tokens tracking the context sent and request continuity rather than file size.
+  This is an inference from correlational evidence, not a measured causal effect.
 - **Codex's October 2026 changes.** Pruning, parent references for subagents and zstd
-  compression reduce the same files to 10.60 GiB. New snapshots still embed images.
+  compression reduce the same files to 10.60 GiB. In a four-session sample, snapshots written
+  after the change still embed images.
 - **A reference-based alternative.** Storing each image once in a media table shared across
   sessions, and referencing it, reduces the 843 comparable files to 3.00 GiB with the same zstd
-  level: 3.53× below the current format.
+  level, against 10.60 GiB for Codex's current files: a measured size ratio of 3.53×. The Codex
+  baseline includes its October 2026 rewrite and compression, while our simulation processed the
+  pre-October originals, and the two sides were matched by file name without verifying
+  modification times. The ratio is a size comparison under this methodology, not a controlled
+  end-to-end production comparison.
 
 We propose a layered, reference-based session store: a conversation log, a latest-checkpoint
 snapshot store, shared media, and an incrementally built project memory file. We give measured
@@ -41,17 +48,19 @@ and expected effects, and recommendations for OpenAI.
 3. **[O] What a snapshot is.** It is 94.50% retained history, 90.21% images, and a 0.35% opaque
    summary. It is a rewrite of the history, not a condensation of it (Section 9.1).
 4. **[O] Cost of compaction.** It is a full-context model call: 230,614 input tokens in the
-   reconstructed turn, a median of 56.5 s, unrelated to snapshot size (ρ = 0.089). It is
-   followed by a full resend (Sections 9.3, 10).
-5. **[O] Tokens and file size.** Tokens are not driven by file size (partial ρ = −0.019,
-   n = 189). Of logged usage rows, 27.1% are candidate duplicates, so summing logs overcounts
+   reconstructed turn, a median of 56.5 s, with no association with snapshot size (ρ = 0.089).
+   In the reconstructed turn, the first request after compaction was sent in full; how often this
+   happens in general was not measured (Sections 9.3, 10).
+5. **[O] Tokens and file size.** After controlling for session length, file size has no
+   association with tokens used (partial ρ = −0.019, n = 189); this is a correlation result, not
+   a causal test. Of logged usage rows, 27.1% are candidate duplicates, so summing logs overcounts
    (Section 10).
 6. **[O] Subagent copies.** A subagent file shrank 124× once the parent history was referenced
    instead of copied. Seven of the ten largest files share its size signature (Section 11.4).
 7. **[O] Codex's October 2026 changes.** They cut the corpus from 52.48 to 10.60 GiB, but leave
    image repetition in snapshots, which compression cannot reach (Section 12).
 8. **[O] Measured alternative.** A shared, content-addressed media store yields 3.00 GiB, 3.53×
-   smaller than Codex's current format. Referencing repeated history items adds almost nothing
+   smaller than Codex's current files, under the comparison conditions of Section 14.1. Referencing repeated history items adds almost nothing
    once compressed. The approaches are complementary (Section 14).
 9. **[P] Priorities for OpenAI.** Three recommendations rank highest: shared content-addressed
    media, snapshots stored by reference with only the latest kept for resume, and parent
@@ -60,25 +69,26 @@ and expected effects, and recommendations for OpenAI.
 
 ## Contents
 
-- 1. Introduction
-- 2. Problem Definition
-- 3. Related Work
-- 4. Dataset, Ethics and Privacy
-- 5. Measurement Taxonomy
-- 6. Methodology
-- 7. Storage Composition
-- 8. Tool, I/O and Artifact Results
-- 9. Compaction and Resume
-- 10. Token Accounting and Its Relation to Stored Session Size
-- 11. Duplication and Subagent Amplification
-- 12. Before and After: Codex's October 2026 Storage Changes
-- 13. Proposed Architecture: A Reference-Based, Layered Session Store
-- 14. Quantitative Evaluation: References versus Compression
-- 15. Security and Privacy Implications
-- 16. Limitations
-- 17. Recommendations for OpenAI
-- 18. Conclusion
-- 19. Appendices
+- [1. Introduction](#1-introduction)
+- [2. Problem Definition](#2-problem-definition)
+- [3. Related Work](#3-related-work)
+- [4. Dataset, Ethics and Privacy](#4-dataset-ethics-and-privacy)
+- [5. Measurement Taxonomy](#5-measurement-taxonomy)
+- [6. Methodology](#6-methodology)
+- [7. Storage Composition](#7-storage-composition)
+- [8. Tool, I/O and Artifact Results](#8-tool-io-and-artifact-results)
+- [9. Compaction and Resume](#9-compaction-and-resume)
+- [10. Token Accounting and Its Relation to Stored Session Size](#10-token-accounting-and-its-relation-to-stored-session-size)
+- [11. Duplication and Subagent Amplification](#11-duplication-and-subagent-amplification)
+- [12. Before and After: Codex's October 2026 Storage Changes](#12-before-and-after-codexs-october-2026-storage-changes)
+- [13. Proposed Architecture: A Reference-Based, Layered Session Store](#13-proposed-architecture-a-reference-based-layered-session-store)
+- [14. Quantitative Evaluation: References versus Compression](#14-quantitative-evaluation-references-versus-compression)
+- [15. Security and Privacy Implications](#15-security-and-privacy-implications)
+- [16. Limitations](#16-limitations)
+- [17. Recommendations for OpenAI](#17-recommendations-for-openai)
+- [18. Conclusion](#18-conclusion)
+- [References](#references)
+- [19. Appendices](#19-appendices)
 
 ---
 
@@ -121,21 +131,24 @@ on the same files.
    files are 34.6× the conversation they record (median 14.7× per file).
 2. **An account of what compaction persists and costs** (Section 9):
    - a snapshot is 94.50% retained history and 90.21% images;
-   - consecutive snapshots are about 98% identical;
-   - a compaction takes a median of 56.5 s, unrelated to the size of what it writes, and is
-     followed by a full resend.
+   - 92.98% of compacted bytes are images and text blocks already present in the preceding
+     snapshot, and in a three-snapshot sample about 98% of items were unchanged;
+   - a compaction takes a median of 56.5 s, with no association with the size of what it writes;
+   - in the reconstructed turn, the first request after compaction was sent in full.
 3. **A duplication analysis** (Section 11). 97.85% of stored image bytes in compacted histories
    are repeats, mostly carried forward within a session. A subagent file shrank 124× once the
    parent history was referenced instead of copied.
 4. **A before/after measurement of Codex's October 2026 changes** (Section 12). On 843 files,
-   compression and a legacy rewrite reduce 52.48 GiB to 10.60 GiB. New snapshots, however, still
-   embed images.
+   compression and a legacy rewrite reduce 52.48 GiB to 10.60 GiB. In a four-session sample,
+   however, new snapshots still embed images.
 5. **A measured alternative** (Section 14). Images referenced from a media table shared across
    sessions, with the same zstd level, store the same 843 files in 3.00 GiB: 3.53× smaller than
-   Codex's current format. The approach complements Codex's own pruning and parent references.
-6. **A token-accounting analysis** (Section 10). Tokens follow the context sent and request
-   continuity, not file size. After controlling for session length, file size has no association
-   with tokens used (partial ρ = −0.019). 27.1% of logged usage rows are candidate duplicates.
+   Codex's current files. The baseline includes Codex's rewrite and compression, whereas the
+   simulation processed pre-October files matched by name, so the ratio is a size comparison under
+   this methodology, not an end-to-end production test (Section 14.1). The approach complements Codex's
+   own pruning and parent references.
+6. **A token-accounting analysis** (Section 10). After controlling for session length, file
+   size has no association with tokens used (partial ρ = −0.019); the evidence is correlational. 27.1% of logged usage rows are candidate duplicates.
 7. **A proposed reference-based, layered session architecture** (Section 13), with
    recommendations for OpenAI (Section 17).
 
@@ -149,11 +162,13 @@ is labelled as observed, inferred, hypothesized or proposed (Section 5.5).
 
 | Sections | Content |
 |---|---|
-| 5–6 | The problem and related work |
-| 7–9 | Data, definitions and method |
-| 10–14 | Results |
-| 15–16 | The proposal and its evaluation |
-| 17–20 | Privacy, limitations, recommendations and conclusions |
+| §2–3 | The problem and related work |
+| §4–6 | Data, definitions and method |
+| §7–12 | Results |
+| §13–14 | The proposal and its evaluation |
+| §15–18 | Privacy, limitations, recommendations and conclusions |
+| — | References |
+| §19 | Appendices |
 
 ---
 
@@ -236,7 +251,7 @@ open measurements (Section 16).
 ## 3.1 Context management for long-horizon agents
 
 **Context as a Tool.** Liu, Yang et al. (*Context as a Tool: Context Management for
-Long-Horizon SWE-Agents*, arXiv:2512.22087, December 2025) criticize two common strategies:
+Long-Horizon SWE-Agents*, arXiv:2512.22087, December 2025) [1] criticize two common strategies:
 appending every interaction to the context, and compressing only when the context is full.
 They argue that both lead to context explosion and semantic drift in long software-engineering
 tasks. Their alternative, CAT, has two parts:
@@ -246,8 +261,8 @@ tasks. Their alternative, CAT, has two parts:
 
 **Relation to this paper.** Their work concerns what the model sees. Ours concerns what the agent
 persists, and how persistence and context interact. Our measurements support their critique from
-the storage side: whole-context compaction in Codex rewrites about 98% unchanged history at every
-window (Section 9). Our proposal (Section 13) has a similar layered structure on disk:
+the storage side: whole-context compaction in Codex re-stores the retained history at every window, and
+92.98% of compacted bytes were already present in the preceding snapshot (Section 9). Our proposal (Section 13) has a similar layered structure on disk:
 - stable project memory;
 - condensed checkpoints;
 - recent items loaded in full.
@@ -257,7 +272,7 @@ window (Section 9). Our proposal (Section 13) has a similar layered structure on
 Users have reported the same patterns in the public Codex issue tracker. These are individual
 reports, not controlled measurements, but they show that our corpus is not an isolated case.
 
-- **openai/codex#24948**, "Codex session logs grow to 700MB-2GB from repeated compaction history
+- **openai/codex#24948** [9], "Codex session logs grow to 700MB-2GB from repeated compaction history
   and raw tool output", opened 2026-05-28.
   - The initial report describes a 732 MB rollout. Of it, 337.8 MB is in 684 `compacted` records
     and 230.8 MB in `function_call_output` records.
@@ -265,7 +280,7 @@ reports, not controlled measurements, but they show that our corpus is not an is
   - Later comments report an 11.36 GiB rollout, about 10.68 GiB of it compacted records.
 
   This matches our findings on compaction dominance (Section 9) and tool outputs (Section 8).
-- **openai/codex#34061**, "Insane Codex Disk Usage from Subagents", opened 2026-07-18.
+- **openai/codex#34061** [10], "Insane Codex Disk Usage from Subagents", opened 2026-07-18.
   - About 755 GiB of session files, of which about 731.5 GiB are in 2,393 subagent files from one
     resumed parent.
   - The reporter hypothesizes that full-history forks copy the parent history into every child.
@@ -277,7 +292,7 @@ Both issues were open when we checked them (2026-10-28).
 
 ## 3.3 Codex's own response
 
-The October 2026 release `rust-v0.164.0` introduced two changes:
+The October 2026 release `rust-v0.164.0` [3] introduced two changes:
 - background zstd compression of idle rollouts;
 - a rewrite of legacy rollouts that prunes superseded snapshots and references parent history
   from subagent files.
@@ -621,6 +636,8 @@ table).
 
 ![Figure 1. Where the stored bytes go](../figures/storage-composition.png)
 
+*Figure 1. Share of all 56,355,653,690 stored bytes in 845 files, by functional category; categories are disjoint and sum to 100%. Source: storage_composition_v1.*
+
 - **[O] One category dominates.** Images that already appeared in the preceding compacted
   record occupy 69.34% of the corpus. Conversation messages occupy 2.89%.
 - **[O] The conversation baseline is mostly images.** The 1,627,855,999 bytes of user-role and
@@ -810,6 +827,8 @@ follow Section 7. Token accounting is treated separately in Section 10.
 
 ![Figure 2. What a compacted snapshot contains](../figures/compacted-snapshot-components.png)
 
+*Figure 2. Share of all 43,464,644,976 compacted bytes in 8,363 snapshots, by part. Source: compacted_item_sizes_v1.*
+
 **[O] Items in `replacement_history`.** It holds 1,224,192 items, 146 per record on average:
 
 | Item | Count |
@@ -843,6 +862,10 @@ retained user-role messages, including their images, and appends a small, opaque
 | 51–100 | 18 |
 | 101 or more | 34 |
 
+![Figure 3. Compaction snapshots per session file](../figures/compaction-growth.png)
+
+*Figure 3. Number of files, out of 845, by the number of compacted snapshots they contain. Source: compaction_growth_v1.*
+
 **[O] Growth.**
 - Across 7,929 consecutive pairs, 4,643 snapshots grew and 3,286 shrank.
 - Per file, the sum of snapshot sizes divided by the last snapshot's size has a median of 2.864,
@@ -870,8 +893,10 @@ snapshot; only 5 skip a snapshot.
 User-role messages made up 9.19–9.20 MB of each record and carried 24 images
 (*zstd_comparison/compaction_snapshot_sample.md*).
 
-**[I] Rewriting, not condensing.** Each compaction rewrites the retained history in full, about
-98% of it unchanged, rather than recording what changed.
+**[I] Rewriting, not condensing.** Each compaction rewrites the retained history in full rather
+than recording what changed. The figure of about 98% unchanged items comes from the
+three-snapshot sample above. The corpus-wide measure is the byte split in the table above: 92.98%
+of compacted bytes were already present in the preceding snapshot.
 
 ## 9.3 Duration and token cost of compaction
 
@@ -945,9 +970,11 @@ The client version that wrote each snapshot is not recorded, so this is not veri
 - **[O] Contents.** A compacted record is 94.50% retained history, which is 90.21% images; the
   summary is 0.35%, opaque.
 - **[O] Repetition.** 89.91% of compacted bytes are images already present in the preceding
-  snapshot, and consecutive snapshots in the sample were about 98% identical.
-- **[O] Cost.** Compaction takes about a minute (median 56.5 s), unrelated to snapshot size,
-  and is followed by a full resend.
+  snapshot, and 3.07% are repeated text blocks. In a three-snapshot sample, about 98% of items
+  were unchanged.
+- **[O] Cost.** Compaction takes about a minute (median 56.5 s), with no association with
+  snapshot size. In the reconstructed turn the next request was a full resend; the general
+  frequency of full resends was not measured.
 - **[I] Implication.** The storage cost of compaction comes from how its result is persisted,
   and its time and token cost come from summarizing the full context. Both point to persisting
   changes and references instead of full snapshots, and to incremental rather than whole-context
@@ -970,15 +997,17 @@ This section answers how recorded token consumption relates to stored content. E
 
 ## Summary
 
-Local session storage and model-token consumption are governed by different mechanisms.
+**[I]** Local session storage and model-token consumption appear to be governed by different
+mechanisms.
 Codex persists the full interaction history on disk, including repeated copies of embedded
 images, but in the ordinary case it transmits only the new input items of each request and
 relies on server-side continuation of the previous response. Recorded input tokens therefore
 track the size of the context the server processes, most of which is reported as cached,
 rather than the number of bytes written to or read from the session file. Across 189 linked
 session files, file size and token totals are strongly rank-correlated, but the association
-disappears once session length is controlled. Within this evidence, storage amplification is a
-disk, memory and parsing cost rather than a direct driver of token consumption.
+disappears once session length is controlled. Within this correlational evidence,
+storage amplification appears to be a disk, memory and parsing cost rather than a direct driver
+of token consumption.
 
 ## 10.1 What the counters measure
 
@@ -1063,6 +1092,10 @@ Cohort: 189 session files linked to the state database whose last record precede
 | File size | 0.931 | −0.019 |
 | Compacted-record bytes | 0.869 | 0.133 |
 | Record count | 0.960 | — |
+
+![Figure 4. What tracks recorded token use](../figures/token-correlation.png)
+
+*Figure 4. Spearman correlation of `tokens_used` with session length and stored size, unadjusted and controlling for record count; 189 files ending before 19 June 2026. Correlations, not causal effects. Source: tokens_vs_storage_v1.*
 
 - **[O]** File size and token totals are strongly associated, but record count, a proxy for
   session length, is the strongest correlate. After partialling out record count, file size has
@@ -1157,6 +1190,10 @@ The duplicate bytes fall into disjoint categories:
 | Same image in another file | 1,747 | 752,086,625 |
 | Same image in both histories of a record | 205 | 93,794,408 |
 | First copy retained | 1,936 | 879,067,554 |
+
+![Figure 5. Embedded images in compacted snapshots](../figures/image-duplication.png)
+
+*Figure 5. Stored bytes of embedded images in compacted histories, by disjoint duplicate category (GiB of stored JSON strings); 99,244 appearances of 1,936 distinct images. Source: compacted_image_duplicates_v1.*
 
 **[O] Persistence.** Of 3,047 image groups that recur within a file and history, 3,042 appear in
 every compacted record between their first and last appearance. Once captured, an image is
@@ -1291,14 +1328,16 @@ identical modification times (*zstd_comparison/stage1_summary.json, stage2_summa
   subagent history. Where a session's snapshots were all distinct windows (pair_02), it removes
   nothing, and compression alone yields 1.53×.
 - **[I] Why compression cannot remove image repetition.** At level 3, zstd's window is 2 MiB
-  (`windowLog` 21 in zstd's `clevels.h`), shorter than the 7–9 MB snapshots in which an image
+  (`windowLog` 21 in zstd's `clevels.h` [12]), shorter than the 7–9 MB snapshots in which an image
   recurs. Each copy is therefore compressed again rather than referenced.
 - **[O] New snapshots are unchanged.** Snapshots written after the change still embed images.
   In four sessions active between 2026-10-16 and 2026-10-28, every compaction wrote a full
   `replacement_history` with images (*post_october_compaction_sample_v1*).
-- **[O] Tokens are not affected.** Token usage follows the context sent to the server, not file
-  size. After controlling for session length, file size is not associated with `tokens_used`
-  (partial Spearman −0.019, n = 189; *tokens_vs_storage_v1/length_control.md*).
+- **[O] No association with tokens.** After controlling for session length, file size is not
+  associated with `tokens_used` (partial Spearman −0.019, n = 189;
+  *tokens_vs_storage_v1/length_control.md*).
+- **[I] Token use.** The storage changes are therefore not expected to change token use. This was
+  not measured directly.
 
 ## 12.5 Summary
 
@@ -1325,8 +1364,8 @@ Section 14, other effects remain to be measured. Supporting figures cite the rep
 ## 13.1 Problem it addresses
 
 - **[O]** Before October 2026, each compaction wrote a complete `replacement_history` snapshot,
-  although about 98% of it was identical to the previous snapshot. In three consecutive
-  snapshots, 270–271 items were kept unchanged and only 6–8 were new.
+  and in a three-snapshot sample about 98% of its items were identical to the previous
+  snapshot. In those three consecutive snapshots, 270–271 items were kept unchanged and only 6–8 were new.
   *(zstd_comparison/compaction_snapshot_sample.md)*
 - **[O]** Images repeated from one snapshot to the next account for 36.39 GiB, or 89.91% of
   compacted bytes. The corpus contains only 1,936 unique images (0.61 GiB).
@@ -1415,8 +1454,8 @@ Section 14, other effects remain to be measured. Supporting figures cite the rep
 
 | Aspect | Current behaviour (pre-October data) | Expected with the proposal |
 |---|---|---|
-| Storage per compaction | full snapshot (e.g. 9.1 MB, ~98% repeated) | new items only (~2% of a snapshot in the sample) |
-| Total storage, measured on 843 files | Codex `.zst` after the October rewrite: 10.60 GiB | images by reference with a shared media table, zstd-3: 3.00 GiB (3.53× smaller) *(media_reference_comparison_v2)* |
+| Storage per compaction | full snapshot (e.g. 9.1 MB; ~98% of items repeated in the sample) | new items only (~2% of a snapshot in the sample) |
+| Total storage, measured on 843 files | Codex `.zst` after the October rewrite: 10.60 GiB | images by reference with a shared media table, zstd-3: 3.00 GiB (3.53× smaller; conditions in Section 14.1) *(media_reference_comparison_v2)* |
 | Images | re-serialized into every snapshot | stored once, referenced |
 | Resume | parse full snapshots, base64 included | load the latest checkpoint plus needed segments |
 | Tokens | full context assembled for each request | unchanged unless partial loading and the decision layer reduce what is sent |
@@ -1477,6 +1516,18 @@ All variants are compressed with zstd level 3, the same as Codex's.
 
 *(scripts `compare_media_reference.py`, `compare_media_reference_v2.py`)*
 
+**Comparison conditions.** The two sides do not start from the same input:
+- **Theirs** is Codex's stored file after its October 2026 legacy rewrite (pruned snapshots,
+  deduplicated `session_meta`, parent references in subagent files), compressed with zstd-3.
+- **Ours** was computed from the pre-October originals, without that rewrite.
+- The 843 pairs were matched by file name. Modification times were not compared, so a session
+  continued after our copy could hold more content on the Codex side.
+
+The 3.53× figure is therefore a measured size ratio under this methodology, not a controlled
+end-to-end comparison of two production systems. A controlled comparison would apply both
+transformations to identical inputs. In the study set (Section 14.3), both sides start from the
+same post-rewrite files.
+
 ## 14.2 Whole corpus: 843 files with a Codex `.zst`
 
 *(media_reference_comparison_v2/summary_corpus.json)*
@@ -1499,7 +1550,9 @@ Components:
 | Per-session copies of images (6,368 file-image pairs) | 2,012,406,757 |
 | SQLite `media` and `session_media` tables | 458,752 |
 
-![Figure 3. Stored size of the same 843 sessions](../figures/storage-comparison.png)
+![Figure 6. Stored size of the same 843 sessions](../figures/storage-comparison.png)
+
+*Figure 6. Stored size of the 843 files with a Codex `.zst` counterpart. The Codex side is the post-October rewrite compressed with zstd-3; the variants were computed from the pre-October originals with the same zstd level, and the pairs were matched by file name (Section 14.1). Source: media_reference_comparison_v2.*
 
 **[O] Validation.** The run reproduces earlier reports exactly:
 - 8,363 compacted records;
@@ -1534,7 +1587,7 @@ Codex's own `.zst` byte for byte.
 
 - **[O] Corpus-wide.** Referencing images from a shared media table stores the corpus in
   3.00 GiB, against 10.60 GiB in Codex's current format (3.53× smaller) and 52.48 GiB originally
-  (17.5× smaller).
+  (17.5× smaller), under the comparison conditions of Section 14.1.
 - **[O] Shared media.** A media table shared across sessions saves 628 MB over per-session
   media: 3,969 distinct images instead of 6,368 file-image pairs.
 - **[O] Item references.** These shrink the uncompressed size by 1.28 GB, but after zstd-3 they
@@ -1686,14 +1739,15 @@ controlled experiment (**X**). All are **[P]** proposals. Section numbers refer 
 1. **Content-addressed media, shared across sessions (M).** Store each image once in a media
    table, link it to sessions through a link table, and keep only a short reference in rollouts
    and snapshots.
-   - On 843 files this stores 3.00 GiB, against 10.60 GiB in the current format: 3.53× smaller.
-     Sharing across sessions saves a further 628 MB (Section 14).
+   - On 843 files this stores 3.00 GiB, against 10.60 GiB in the current format: 3.53× smaller,
+     a size ratio under the comparison conditions of Section 14.1. Sharing across sessions saves a
+     further 628 MB (Section 14).
 2. **Snapshots by reference, in a separate store (M/E).** Persist each compaction snapshot as a
    list of item references, or as changes from the previous snapshot, in a store separate from
    the session log.
    - Keep the latest snapshot for resume, and prune or archive older ones by policy.
-   - Consecutive snapshots are about 98% identical, and 89.91% of compacted bytes are images
-     carried from the preceding snapshot (Section 9.2). Codex's own rewrite already prunes
+   - 89.91% of compacted bytes are images carried from the preceding snapshot, and in a
+     three-snapshot sample about 98% of items were unchanged (Section 9.2). Codex's own rewrite already prunes
      superseded snapshots (Section 12).
 3. **Reference inherited history everywhere (M).** Keep the October parent reference for
    subagents and extend it to forks and resumes. In one case it reduced a subagent file 124×
@@ -1791,10 +1845,11 @@ Its cost in time and tokens comes from summarizing the full context. The cost of
 comes from copying instead of referencing.
 
 Codex's October 2026 changes reduced the same files from 52.48 to 10.60 GiB by pruning
-superseded snapshots, referencing parent history from subagents and compressing. Snapshots
-written after the change still embed their images, and compression cannot reach repetition
+superseded snapshots, referencing parent history from subagents and compressing. In a
+four-session sample, snapshots written after the change still embed their images, and compression cannot reach repetition
 spread across multi-megabyte snapshots. Storing each image once and referencing it, from a media
-table shared across sessions, reduces the same files to 3.00 GiB, 3.53× below the current format.
+table shared across sessions, reduces the same files to 3.00 GiB: a measured size ratio of
+3.53× against the current format, under the comparison conditions of Section 14.1.
 The two approaches remove different redundancy and work best together.
 
 Storage is the easiest gain to measure, but not the only one. The same principle of storing once
@@ -1809,6 +1864,58 @@ Such a design could make resume lighter and compaction cheaper, and could let a 
 load what fits instead of compacting again. These effects are expected from the mechanism but
 not yet measured. We list the experiments that would establish them (Section 16.4) and the
 changes we recommend (Section 17).
+
+---
+
+# References
+
+All links were checked on 2026-10-28. Source-file links point to the exact commit analysed.
+
+**Research**
+
+[1] S. Liu, J. Yang, et al. *Context as a Tool: Context Management for Long-Horizon SWE-Agents.*
+arXiv:2512.22087, December 2025. https://arxiv.org/abs/2512.22087
+
+**Codex source code and release**
+
+[2] OpenAI. *Codex* (source repository). https://github.com/openai/codex
+
+[3] OpenAI. *Codex release 0.164.0*, tag `rust-v0.164.0`, commit `6aaac69`, published 2026-10-23.
+https://github.com/openai/codex/releases/tag/rust-v0.164.0
+
+[4] `codex-rs/core/src/session/turn.rs`: compaction triggers and path selection.
+https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/session/turn.rs
+
+[5] `codex-rs/core/src/compact.rs`: local compaction.
+https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/compact.rs
+
+[6] `codex-rs/core/src/compact_remote_v2_installation.rs`: installation of remote compaction output.
+https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/compact_remote_v2_installation.rs
+
+[7] `codex-rs/core/src/client.rs`: incremental and full requests.
+https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/client.rs
+
+[8] `codex-rs/rollout/src/compression.rs`: background rollout compression.
+https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/rollout/src/compression.rs
+
+**Public issue reports**
+
+[9] openai/codex#24948. *Codex session logs grow to 700MB-2GB from repeated compaction history and
+raw tool output.* Opened 2026-05-28. https://github.com/openai/codex/issues/24948
+
+[10] openai/codex#34061. *Insane Codex Disk Usage from Subagents.* Opened 2026-07-18.
+https://github.com/openai/codex/issues/34061
+
+**Zstandard**
+
+[11] Y. Collet and M. Kucherawy (Ed.). *Zstandard Compression and the 'application/zstd' Media
+Type.* RFC 8878, 2021. https://www.rfc-editor.org/rfc/rfc8878
+
+[12] facebook/zstd, `lib/compress/clevels.h`: compression-level parameters. Level 3 uses
+`windowLog` 21, a 2 MiB window. https://github.com/facebook/zstd/blob/dev/lib/compress/clevels.h
+
+[13] *Zstandard: real-time data compression algorithm* (project site).
+https://facebook.github.io/zstd/
 
 ---
 
@@ -1876,5 +1983,6 @@ The `openai/codex` repository, tag `rust-v0.164.0`, commit
 | `codex-rs/rollout/src/compression.rs` | zstd level 3; 7-day idle threshold; `materialize_rollout_for_append` |
 | `codex-rs/core/src/client.rs` | incremental requests (`previous_response_id`) and the conditions for a full send |
 
-Supporting reference: zstd `lib/compress/clevels.h`, level 3 parameters (`windowLog` 21, a 2 MiB
+Permalinks to each file are listed in References [4]–[8]. Supporting reference: zstd
+`lib/compress/clevels.h` [12], level 3 parameters (`windowLog` 21, a 2 MiB
 window).
