@@ -120,8 +120,8 @@ These are proposals; their effects beyond storage are not yet measured (paper Se
 | Component | Status |
 |---|---|
 | Paper, figures, aggregate results | Public in this repository |
-| Figures from aggregate numbers | Checkable: every plotted value appears in `results/` or in the paper tables |
-| Analysis scripts and synthetic tests | To be published separately by the author |
+| Figures from aggregate numbers | Reproducible with `scripts/make_figures.py`; every plotted value appears in `results/` or in the paper tables |
+| Analysis scripts, migrations and synthetic tests | Public in [scripts/](scripts/) and [database/](database/); 225 tests run without private data |
 | Re-running the measurements | Requires the private session files, which are not published |
 | Codex code behaviour cited | Public: `openai/codex` at tag `rust-v0.164.0`; links in the paper's References |
 
@@ -147,7 +147,8 @@ Please cite using [CITATION.cff](CITATION.cff):
 ## License
 
 The paper, figures, results and documentation are released under CC BY 4.0 (see
-[LICENSE](LICENSE)).
+[LICENSE](LICENSE)). The source code in `scripts/` and `database/` is released under the MIT
+License (see [LICENSE-CODE](LICENSE-CODE)).
 
 ## Feedback
 
