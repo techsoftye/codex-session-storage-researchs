@@ -1,0 +1,253 @@
+{
+  "title": "Codex session storage research: aggregated metrics",
+  "notes": [
+    "Byte counts of stored records; bytes are not tokens.",
+    "Corpus: 845 Codex rollout files from one user, 2026-01-03 to 2026-10-04, before the October 2026 storage rewrite.",
+    "No conversation content, identifiers or images are included."
+  ],
+  "dataset": {
+    "files": 845,
+    "bytes": 56355653690,
+    "gib": 52.4853,
+    "physical_records": 3497535
+  },
+  "record_types": [
+    {
+      "type": "event_msg",
+      "records": 1849181,
+      "bytes": 4758495586,
+      "share": 0.084437
+    },
+    {
+      "type": "response_item",
+      "records": 1490433,
+      "bytes": 7030455815,
+      "share": 0.124752
+    },
+    {
+      "type": "token_usage_record",
+      "records": 72324,
+      "bytes": 65230877,
+      "share": 0.001157
+    },
+    {
+      "type": "turn_context",
+      "records": 52095,
+      "bytes": 261993740,
+      "share": 0.004649
+    },
+    {
+      "type": "world_state",
+      "records": 11853,
+      "bytes": 449686946,
+      "share": 0.007979
+    },
+    {
+      "type": "session_meta",
+      "records": 10562,
+      "bytes": 324813399,
+      "share": 0.005764
+    },
+    {
+      "type": "compacted",
+      "records": 8363,
+      "bytes": 43464644976,
+      "share": 0.771256
+    },
+    {
+      "type": "inter_agent_communication_metadata",
+      "records": 2724,
+      "bytes": 332351,
+      "share": 6e-06
+    }
+  ],
+  "record_types_source": "data/reports/record_type_counts_corrected_v1.json",
+  "functional_composition": [
+    {
+      "category": "compacted_image_repeated_from_previous_snapshot",
+      "bytes": 39077030034,
+      "share": 0.6934
+    },
+    {
+      "category": "compacted_text_repeated_from_previous_snapshot",
+      "bytes": 1335546618,
+      "share": 0.023699
+    },
+    {
+      "category": "compacted_other",
+      "bytes": 3052068324,
+      "share": 0.054157
+    },
+    {
+      "category": "processing_response_item",
+      "bytes": 5339656937,
+      "share": 0.094749
+    },
+    {
+      "category": "processing_event_msg",
+      "bytes": 3136268147,
+      "share": 0.055651
+    },
+    {
+      "category": "conversation_user_role_and_assistant",
+      "bytes": 1627855999,
+      "share": 0.028885
+    },
+    {
+      "category": "logging_copies_event_msg",
+      "bytes": 995650129,
+      "share": 0.017667
+    },
+    {
+      "category": "token_counters_event_msg",
+      "bytes": 626577310,
+      "share": 0.011118
+    },
+    {
+      "category": "state_and_metadata",
+      "bytes": 1102057313,
+      "share": 0.019555
+    },
+    {
+      "category": "other_response_item",
+      "bytes": 62942879,
+      "share": 0.001117
+    }
+  ],
+  "functional_composition_source": "data/reports/storage_composition_v1",
+  "conversation_baseline": {
+    "bytes": 1627855999,
+    "embedded_image_base64_bytes": 1269084976,
+    "text_without_image_base64_bytes": 358771023,
+    "ratios_corpus_weighted": {
+      "all_bytes_over_conversation": 34.6196,
+      "all_bytes_over_conversation_text": 157.0797,
+      "processing_over_conversation": 5.2068,
+      "compacted_over_conversation": 26.7005
+    },
+    "ratios_per_file_median": {
+      "all_bytes_over_conversation": 14.7331,
+      "all_bytes_over_conversation_text": 20.765,
+      "processing_over_conversation": 2.6241,
+      "compacted_over_conversation": 0.6658
+    },
+    "source": "data/reports/storage_composition_v1"
+  },
+  "compaction": {
+    "compacted_records": 8363,
+    "files_with_compacted": 434,
+    "compacted_bytes": 43464644976,
+    "replacement_history_bytes": 41073238627,
+    "replacement_history_image_bytes": 39210063415,
+    "guardian_history_bytes": 2387178293,
+    "compaction_summary_item_bytes": 153735880,
+    "history_items": 1424366,
+    "replacement_history_items": 1224192,
+    "consecutive_pairs_grown": 4643,
+    "consecutive_pairs_shrunk": 3286,
+    "snapshots_per_file": {
+      "0": 411,
+      "1": 158,
+      "2-5": 97,
+      "6-10": 34,
+      "11-25": 63,
+      "26-50": 30,
+      "51-100": 18,
+      "101+": 34
+    },
+    "duration_seconds": {
+      "n": 755,
+      "median": 56.531,
+      "p90": 123.2316
+    },
+    "spearman_duration_vs_snapshot_bytes": {
+      "n": 697,
+      "rho": 0.089
+    },
+    "sources": [
+      "data/reports/compacted_item_sizes_v1",
+      "data/reports/compaction_growth_v1",
+      "data/reports/compaction_cost_v1"
+    ]
+  },
+  "images_compacted": {
+    "appearances": 99244,
+    "distinct": 1936,
+    "distinct_decoded_bytes": 659263798,
+    "stored_bytes": 40838429952,
+    "duplicate_share_of_stored": 0.978475,
+    "same_file_later_snapshot_bytes": 38045175558,
+    "across_files_bytes": 752086625,
+    "source": "data/reports/compacted_image_duplicates_v1"
+  },
+  "text_compacted": {
+    "occurrences": 1899050,
+    "distinct_blocks": 181206,
+    "stored_gib": 1.869962,
+    "duplicate_gib": 1.459266,
+    "source": "data/reports/compacted_text_duplicates_v1"
+  },
+  "images_all_records": {
+    "occurrences": 106260,
+    "base64_bytes": 43635193249,
+    "distinct": 3969,
+    "distinct_decoded_bytes": 1384078592,
+    "source": "data/reports/media_reference_comparison_v2/summary_corpus.json"
+  },
+  "tokens": {
+    "spearman_tokens_used_vs_file_size": {
+      "n": 189,
+      "unadjusted": 0.931433,
+      "partial_controlling_record_count": -0.018564
+    },
+    "spearman_tokens_used_vs_compacted_bytes": {
+      "n": 189,
+      "unadjusted": 0.86933,
+      "partial_controlling_record_count": 0.133363
+    },
+    "spearman_tokens_used_vs_record_count": {
+      "n": 189,
+      "rho": 0.959559
+    },
+    "usage_observations": 1778473,
+    "possible_duplicate_usage_rows": 481420,
+    "sources": [
+      "data/reports/tokens_vs_storage_v1",
+      "data/reports/token_usage_duplicate_candidates_v1"
+    ]
+  },
+  "october_2026_comparison": {
+    "files_with_codex_zst": 843,
+    "original_bytes": 56353330276,
+    "codex_zst_bytes": 11381948312,
+    "source": "data/reports/zst_counterpart_sizes_v1 (aggregates only)"
+  },
+  "reference_variants_corpus": {
+    "theirs": {
+      "bytes": 11381948312,
+      "gib": 10.6003,
+      "theirs_over_variant": null
+    },
+    "ours_v1_media_per_session": {
+      "bytes": 3853059232,
+      "gib": 3.5884,
+      "theirs_over_variant": 2.954
+    },
+    "ours_v1_media_shared": {
+      "bytes": 3225189819,
+      "gib": 3.0037,
+      "theirs_over_variant": 3.5291
+    },
+    "ours_v2_media_per_session": {
+      "bytes": 3852692848,
+      "gib": 3.5881,
+      "theirs_over_variant": 2.9543
+    },
+    "ours_v2_media_shared": {
+      "bytes": 3224823435,
+      "gib": 3.0034,
+      "theirs_over_variant": 3.5295
+    }
+  },
+  "reference_variants_source": "data/reports/media_reference_comparison_v2/summary_corpus.json"
+}
